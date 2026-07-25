@@ -434,13 +434,24 @@ elif menu == "📊 Tableau de Bord":
     st.header("📊 Performance & Statistiques")
     
     # KPIs
-    q_stats = "SELECT SUM(v.prix_total) as CA, SUM(v.prix_total - (p.prix_achat * v.quantite_vendue)) as Benef FROM ventes v JOIN produits p ON v.produit_id = p.id"
+    # On calcule le CA et le Bénéfice Brut basés sur la valeur totale des ventes enregistrées à la validation
+    q_stats = """
+        SELECT 
+            SUM(v.prix_total) as CA, 
+            SUM(v.prix_total - (p.prix_achat * v.quantite_vendue)) as Benef 
+        FROM ventes v 
+        JOIN produits p ON v.produit_id = p.id
+    """
     res = pd.read_sql_query(q_stats, conn)
-    dep_total = pd.read_sql_query("SELECT SUM(montant) FROM depenses", conn).iloc[0,0] or 0
+    
+    # On récupère les dépenses
+    dep_total_res = pd.read_sql_query("SELECT SUM(montant) FROM depenses", conn).iloc[0, 0]
+    dep_total = dep_total_res if pd.notnull(dep_total_res) else 0
+
+    ca = res['CA'].sum() if pd.notnull(res['CA'].sum()) else 0
+    benef_b = res['Benef'].sum() if pd.notnull(res['Benef'].sum()) else 0
     
     c1, c2, c3 = st.columns(3)
-    ca = res['CA'].sum() or 0
-    benef_b = res['Benef'].sum() or 0
     c1.metric("Chiffre d'Affaires", f"{ca:,.0f} FG")
     c2.metric("Bénéfice Brut", f"{benef_b:,.0f} FG")
     c3.metric("Bénéfice Net (Moins Dépenses)", f"{(benef_b - dep_total):,.0f} FG")
@@ -452,19 +463,17 @@ elif menu == "📊 Tableau de Bord":
         df_chart['date'] = pd.to_datetime(df_chart['date'])
         st.line_chart(df_chart.set_index('date'))
 
-        # --- BOUTON D'EXPORTATION ---
+    # --- BOUTON D'EXPORTATION ---
     st.divider()
     st.subheader("📥 Exporter les données")
     
-    # On prépare les données des ventes pour l'export
     df_export = pd.read_sql_query("""
         SELECT v.date, v.nom_client, p.nom as produit, 
                v.quantite_vendue, v.prix_total, v.type_paiement, v.statut_dette 
         FROM ventes v JOIN produits p ON v.produit_id = p.id
     """, conn)
 
-    # Création du bouton de téléchargement (Format CSV, lisible par Excel)
-    csv = df_export.to_csv(index=False).encode('utf-8-sig') # utf-8-sig pour que les accents s'affichent bien dans Excel
+    csv = df_export.to_csv(index=False).encode('utf-8-sig')
     
     st.download_button(
         label="📥 Télécharger l'Historique des Ventes (Excel/CSV)",
@@ -475,10 +484,11 @@ elif menu == "📊 Tableau de Bord":
     
     # HISTORIQUE COMPLET
     st.subheader("📜 Historique de chaque vente")
-    hist_q = """SELECT v.date, v.nom_client, p.nom as produit, v.quantite_vendue as qte, v.prix_total as total, v.type_paiement 
-                FROM ventes v JOIN produits p ON v.produit_id = p.id ORDER BY v.id DESC"""
+    hist_q = """
+        SELECT v.date, v.nom_client, p.nom as produit, v.quantite_vendue as qte, v.prix_total as total, v.type_paiement 
+        FROM ventes v JOIN produits p ON v.produit_id = p.id ORDER BY v.id DESC
+    """
     st.dataframe(pd.read_sql_query(hist_q, conn), use_container_width=True)
-
 # --- SECTION : EMPLOYES EN LIGNE (NOUVEAU) ---
 elif menu == "👥 Employés en Ligne" and st.session_state.role == "Patron":
     st.header("👥 Présence des Employés")
