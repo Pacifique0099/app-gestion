@@ -410,7 +410,8 @@ elif menu == "💸 Finances & Dépenses":
             if st.button("Valider Paiement Dette"):
                 c = conn.cursor()
                 nv = r['prix_total'] - vers
-                c.execute("UPDATE ventes SET prix_total=?, statut_dette=? WHERE id=?", (nv, 'Payé' if nv <= 0 else 'Non Payé', int(r['id'])))
+                statut = 'Payé' if nv_reste <= 0 else 'Non Payé'
+                c.execute("""UPDATE ventes SET reste_a_payer=?, statut_dette=? WHERE id=?""", (nv_reste, statut, int(r['id'])))
                 conn.commit(); st.success("Paiement enregistré !"); st.rerun()
         else: st.info("Aucune dette en cours.")
 
