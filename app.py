@@ -305,6 +305,11 @@ if menu == "🛒 Caisse":
                         st.session_state.panier = [] # Vider le panier
                         st.success("🎉 Vente enregistrée avec succès !")
                         st.rerun()
+                        
+        if st.button("🗑️ Vider le panier"):
+            st.session_state.panier = []
+            st.rerun()
+
 # --- SECTION : STOCK ---
 elif menu == "📦 Stock":
     st.header("📦 Gestion des Stocks")
