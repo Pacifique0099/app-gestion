@@ -239,9 +239,11 @@ if menu == "🛒 Caisse":
                     nc = st.selectbox("Sélectionner le client", avances_df['nom_client'].tolist())
                     solde_client = avances_df[avances_df['nom_client'] == nc]['solde'].values[0]
                     st.info(f"Solde disponible : {solde_client:,.0f} FG")
+                    
+                    # Message explicatif si l'avance ne couvre pas tout
                     if solde_client < total_panier:
-                        st.warning("❌ Solde insuffisant pour cette vente.")
-                        valider_possible = False
+                        dette_reste = total_panier - solde_client
+                        st.warning(f"⚠️ L'avance couvre {solde_client:,.0f} FG. Le reste ({dette_reste:,.0f} FG) sera enregistré en DETTE.")
             else:
                 nc = st.text_input("Nom du Client / N° Ticket")
 
@@ -251,26 +253,58 @@ if menu == "🛒 Caisse":
                 else:
                     with sqlite3.connect('boutique.db') as conn_val:
                         cur = conn_val.cursor()
-                        for i in st.session_state.panier:
-                            # 1. Diminuer le stock
-                            cur.execute("UPDATE produits SET quantite = quantite - ? WHERE id = ?", (i['qte'], i['id']))
-                            # 2. Enregistrer la vente avec le prix manuel
-                            cur.execute("""INSERT INTO ventes (produit_id, quantite_vendue, prix_total, type_paiement, nom_client, statut_dette) 
-                                        VALUES (?,?,?,?,?,?)""",
-                                      (i['id'], i['qte'], i['total'], m, nc, "Payé" if m != "Dette" else "Non Payé"))
                         
-                        # 3. Si c'est une avance, on déduit du compte client
+                        # --- GESTION SPÉCIALE DU PAIEMENT PAR AVANCE ---
                         if m == "Avance":
-                            cur.execute("UPDATE comptes_clients SET solde = solde - ? WHERE nom_client = ?", (total_panier, nc))
-                        
+                            solde_client = pd.read_sql_query("SELECT solde FROM comptes_clients WHERE nom_client = ?", conn_val, params=(nc,)).iloc[0,0]
+                            
+                            if solde_client >= total_panier:
+                                # L'avance suffit à tout payer
+                                cur.execute("UPDATE comptes_clients SET solde = solde - ? WHERE nom_client = ?", (total_panier, nc))
+                                type_p, statut_d = "Avance", "Payé"
+                                total_vente_enregistre = total_panier
+                            else:
+                                # L'avance est insuffisante : on vide le solde client et le reste va en Dette
+                                reste_en_dette = total_panier - solde_client
+                                cur.execute("UPDATE comptes_clients SET solde = 0 WHERE nom_client = ?", (nc,))
+                                
+                                # 1. On enregistre la partie payée par avance
+                                if solde_client > 0:
+                                    for i in st.session_state.panier:
+                                        cur.execute("""INSERT INTO ventes (produit_id, quantite_vendue, prix_total, type_paiement, nom_client, statut_dette) 
+                                                        VALUES (?,?,?,?,?,?)""",
+                                                    (i['id'], i['qte'], solde_client, "Avance", nc, "Payé"))
+                                        break # Enregistre l'avance globale sur le premier article pour le total
+                                
+                                # 2. La dette enregistrée pour la partie manquante
+                                type_p, statut_d = "Dette", "Non Payé"
+                                total_vente_enregistre = reste_en_dette
+                        else:
+                            type_p = m
+                            statut_d = "Payé" if m != "Dette" else "Non Payé"
+                            total_vente_enregistre = total_panier
+
+                        # --- ENREGISTREMENT DE LA VENTE ET DÉDUCTION DU STOCK ---
+                        if m != "Avance" or (m == "Avance" and solde_client >= total_panier):
+                            for i in st.session_state.panier:
+                                cur.execute("UPDATE produits SET quantite = quantite - ? WHERE id = ?", (i['qte'], i['id']))
+                                cur.execute("""INSERT INTO ventes (produit_id, quantite_vendue, prix_total, type_paiement, nom_client, statut_dette) 
+                                                VALUES (?,?,?,?,?,?)""",
+                                            (i['id'], i['qte'], i['total'], type_p, nc, statut_d))
+                        elif m == "Avance" and solde_client < total_panier:
+                            # Déduction des stocks dans le cas mixte (Avance + Dette)
+                            for i in st.session_state.panier:
+                                cur.execute("UPDATE produits SET quantite = quantite - ? WHERE id = ?", (i['qte'], i['id']))
+                            # Enregistrement de la dette résiduelle
+                            premiere_item = st.session_state.panier[0]
+                            cur.execute("""INSERT INTO ventes (produit_id, quantite_vendue, prix_total, type_paiement, nom_client, statut_dette) 
+                                            VALUES (?,?,?,?,?,?)""",
+                                        (premiere_item['id'], premiere_item['qte'], reste_en_dette, "Dette", nc, "Non Payé"))
+
                         conn_val.commit()
                         st.session_state.panier = [] # Vider le panier
                         st.success("🎉 Vente enregistrée avec succès !")
                         st.rerun()
-
-        if st.button("🗑️ Vider le panier"):
-            st.session_state.panier = []
-            st.rerun()
 # --- SECTION : STOCK ---
 elif menu == "📦 Stock":
     st.header("📦 Gestion des Stocks")
