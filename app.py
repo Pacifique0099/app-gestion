@@ -7,7 +7,7 @@ import hashlib
 from supabase import create_client
 
 # Remplacez par vos vraies infos copiées à l'étape 2
-url = "https://cvouehtjccrwqwibbpty.supabase.co/rest/v1/"
+url = "https://cvouehtjccrwqwibbpty.supabase.co"
 key = "sb_publishable_hO06P_FEf9CP8cighvS19Q_1tZ_S4hE"
 supabase = create_client(url, key)
 
