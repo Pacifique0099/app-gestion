@@ -200,7 +200,7 @@ if menu == "🛒 Caisse":
             choix = c1.selectbox("Produit", p_df['nom'].tolist())
             pi = p_df[p_df['nom'] == choix].iloc[0]
             
-            qte = c2.number_input("Quantité", min_value=1, value=1)
+            qte = c2.number_input("Quantité", min_value=0.01, value=0.01)
             # Case de prix modifiable (propose le prix de vente par défaut)
             prix_vente_final = c3.number_input("Prix de Vente (FG)", min_value=0.0, value=float(pi['prix_vente']))
             
@@ -524,7 +524,7 @@ elif menu == "☎️ Aide & Support":
     with col1:
         st.info("""
         ### 👨‍💻 Développeur : Pacy MUHA
-        - **Téléphone :** +257 79 799 794 (Votre numéro)
+        - **Téléphone :** +257 79 799 794
         - **Email :** mbonimpapacy1@gmail.com
         - **Services :** Mise à jour, Maintenance, Formation.
         """)
