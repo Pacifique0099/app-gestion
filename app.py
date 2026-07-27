@@ -150,19 +150,6 @@ if not st.session_state.auth:
         if st.form_submit_button("Se connecter"):
             conn = sqlite3.connect('boutique.db')
             c = conn.cursor()
-
-            # ivyo nongeyemwo
-c = conn.cursor()
-try:
-    c.execute("ALTER TABLE ventes ADD COLUMN reste_a_payer REAL")
-    # Pour les ventes déjà enregistrées, le reste à payer est égal au prix total par défaut
-    c.execute("UPDATE ventes SET reste_a_payer = prix_total WHERE reste_a_payer IS NULL")
-    conn.commit()
-except Exception:
-    # La colonne existe déjà, on ignore l'erreur
-    pass
-
-    # Kugezaha
             
             # On cherche l'utilisateur
             c.execute("SELECT role FROM utilisateurs WHERE identifiant=? AND mot_de_passe=?", (u, p))
