@@ -397,39 +397,67 @@ elif menu == "💸 Finances & Dépenses":
     t1, t2, t3 = st.tabs(["🤝 Dettes Clients", "🏦 Avances", "💰 Dépenses"])
     
     with t1:
-        d_df = pd.read_sql_query("SELECT v.id, v.nom_client, p.nom as produit, v.prix_total FROM ventes v JOIN produits p ON v.produit_id = p.id WHERE v.statut_dette = 'Non Payé'", conn)
+        # NOTE : Si vous n'avez pas la colonne reste_a_payer dans la DB, 
+        # assurez-vous d'utiliser un champ 'reste_a_payer' séparé de 'prix_total'
+        d_df = pd.read_sql_query("""
+            SELECT v.id, v.nom_client, p.nom as produit, v.prix_total, 
+                   COALESCE(v.reste_a_payer, v.prix_total) as reste_a_payer 
+            FROM ventes v 
+            JOIN produits p ON v.produit_id = p.id 
+            WHERE v.statut_dette = 'Non Payé'
+        """, conn)
+        
         if not d_df.empty:
             for cl in d_df['nom_client'].unique():
-                with st.expander(f"👤 {cl} | Total Dû : {d_df[d_df['nom_client']==cl]['prix_total'].sum():,.0f} FG"):
-                    st.table(d_df[d_df['nom_client']==cl][['produit', 'prix_total']])
+                with st.expander(f"👤 {cl} | Total Dû : {d_df[d_df['nom_client']==cl]['reste_a_payer'].sum():,.0f} FG"):
+                    st.table(d_df[d_df['nom_client']==cl][['produit', 'prix_total', 'reste_a_payer']])
             
             sel_cl = st.selectbox("Sélectionner Client pour Paiement", d_df['nom_client'].unique())
             art_cl = st.selectbox("Article concerné", d_df[d_df['nom_client']==sel_cl]['produit'].tolist())
             r = d_df[(d_df['nom_client']==sel_cl) & (d_df['produit']==art_cl)].iloc[0]
-            vers = st.number_input("Somme versée", max_value=float(r['prix_total']))
+            
+            vers = st.number_input("Somme versée", min_value=0.0, max_value=float(r['reste_a_payer']))
+            
             if st.button("Valider Paiement Dette"):
                 c = conn.cursor()
-                nv = r['prix_total'] - vers
+                nv_reste = r['reste_a_payer'] - vers
                 statut = 'Payé' if nv_reste <= 0 else 'Non Payé'
-                c.execute("""UPDATE ventes SET reste_a_payer=?, statut_dette=? WHERE id=?""", (nv_reste, statut, int(r['id'])))
-                conn.commit(); st.success("Paiement enregistré !"); st.rerun()
-        else: st.info("Aucune dette en cours.")
+                
+                # CORRECTION MAJEURE : On met à jour reste_a_payer et statut_dette,
+                # MAIS ON NE TOUCHERA JAMAIS A 'prix_total' (pour garder le bénéfice intact) !
+                c.execute("""
+                    UPDATE ventes 
+                    SET reste_a_payer=?, statut_dette=? 
+                    WHERE id=?
+                """, (nv_reste, statut, int(r['id'])))
+                
+                conn.commit()
+                st.success("Paiement enregistré ! Le bénéfice reste inchangé.")
+                st.rerun()
+        else: 
+            st.info("Aucune dette en cours.")
 
     with t2:
         with st.form("avance"):
             na, ma = st.text_input("Nom du Client"), st.number_input("Montant de l'avance", min_value=0.0)
             if st.form_submit_button("Ajouter Avance"):
-                c = conn.cursor(); c.execute("INSERT INTO comptes_clients (nom_client, solde) VALUES (?,?) ON CONFLICT(nom_client) DO UPDATE SET solde=solde+?", (na, ma, ma))
-                conn.commit(); st.success("Avance ajoutée !"); st.rerun()
+                c = conn.cursor()
+                c.execute("INSERT INTO comptes_clients (nom_client, solde) VALUES (?,?) ON CONFLICT(nom_client) DO UPDATE SET solde=solde+?", (na, ma, ma))
+                conn.commit()
+                st.success("Avance ajoutée !")
+                st.rerun()
         st.dataframe(pd.read_sql_query("SELECT nom_client, solde FROM comptes_clients WHERE solde > 0", conn))
 
     with t3:
         with st.form("depense"):
             mo, mt = st.text_input("Motif"), st.number_input("Montant", min_value=0.0)
             if st.form_submit_button("Enregistrer Dépense"):
-                c = conn.cursor(); c.execute("INSERT INTO depenses (motif, montant) VALUES (?,?)", (mo, mt)); conn.commit(); st.success("Dépense notée !"); st.rerun()
+                c = conn.cursor()
+                c.execute("INSERT INTO depenses (motif, montant) VALUES (?,?)", (mo, mt))
+                conn.commit()
+                st.success("Dépense notée !")
+                st.rerun()
         st.table(pd.read_sql_query("SELECT date, motif, montant FROM depenses ORDER BY id DESC", conn))
-
 # --- SECTION : TABLEAU DE BORD (PATRON SEULEMENT) ---
 elif menu == "📊 Tableau de Bord":
     st.header("📊 Performance & Statistiques")
