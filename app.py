@@ -411,44 +411,51 @@ elif menu == "💸 Finances & Dépenses":
     t1, t2, t3 = st.tabs(["🤝 Dettes Clients", "🏦 Avances", "💰 Dépenses"])
     
     with t1:
-        # NOTE : Si vous n'avez pas la colonne reste_a_payer dans la DB, 
-        # assurez-vous d'utiliser un champ 'reste_a_payer' séparé de 'prix_total'
-        d_df = pd.read_sql_query("""
+        # On sélectionne les ventes non payées en s'assurant d'avoir reste_a_payer
+        query_dettes = """
             SELECT v.id, v.nom_client, p.nom as produit, v.prix_total, 
                    COALESCE(v.reste_a_payer, v.prix_total) as reste_a_payer 
             FROM ventes v 
             JOIN produits p ON v.produit_id = p.id 
             WHERE v.statut_dette = 'Non Payé'
-        """, conn)
+        """
+        d_df = pd.read_sql_query(query_dettes, conn)
         
         if not d_df.empty:
             for cl in d_df['nom_client'].unique():
-                with st.expander(f"👤 {cl} | Total Dû : {d_df[d_df['nom_client']==cl]['reste_a_payer'].sum():,.0f} FG"):
-                    st.table(d_df[d_df['nom_client']==cl][['produit', 'prix_total', 'reste_a_payer']])
+                total_du = d_df[d_df['nom_client'] == cl]['reste_a_payer'].sum()
+                with st.expander(f"👤 {cl} | Total Dû : {total_du:,.0f} FG"):
+                    st.table(d_df[d_df['nom_client'] == cl][['produit', 'prix_total', 'reste_a_payer']])
             
             sel_cl = st.selectbox("Sélectionner Client pour Paiement", d_df['nom_client'].unique())
-            art_cl = st.selectbox("Article concerné", d_df[d_df['nom_client']==sel_cl]['produit'].tolist())
-            r = d_df[(d_df['nom_client']==sel_cl) & (d_df['produit']==art_cl)].iloc[0]
+            art_cl = st.selectbox("Article concerné", d_df[d_df['nom_client'] == sel_cl]['produit'].tolist())
             
-            vers = st.number_input("Somme versée", min_value=0.0, max_value=float(r['reste_a_payer']))
+            r = d_df[(d_df['nom_client'] == sel_cl) & (d_df['produit'] == art_cl)].iloc[0]
+            
+            vers = st.number_input(
+                "Somme versée", 
+                min_value=0.0, 
+                max_value=float(r['reste_a_payer']),
+                step=500.0
+            )
             
             if st.button("Valider Paiement Dette"):
                 c = conn.cursor()
                 nv_reste = r['reste_a_payer'] - vers
                 statut = 'Payé' if nv_reste <= 0 else 'Non Payé'
                 
-                # CORRECTION MAJEURE : On met à jour reste_a_payer et statut_dette,
-                # MAIS ON NE TOUCHERA JAMAIS A 'prix_total' (pour garder le bénéfice intact) !
+                # On met à jour SEULEMENT reste_a_payer et statut_dette.
+                # 'prix_total' reste intact pour garder le bénéfice exact dans le Tableau de bord !
                 c.execute("""
                     UPDATE ventes 
-                    SET reste_a_payer=?, statut_dette=? 
-                    WHERE id=?
+                    SET reste_a_payer = ?, statut_dette = ? 
+                    WHERE id = ?
                 """, (nv_reste, statut, int(r['id'])))
                 
                 conn.commit()
-                st.success("Paiement enregistré ! Le bénéfice reste inchangé.")
+                st.success("Paiement enregistré avec succès !")
                 st.rerun()
-        else: 
+        else:
             st.info("Aucune dette en cours.")
 
     with t2:
@@ -472,6 +479,7 @@ elif menu == "💸 Finances & Dépenses":
                 st.success("Dépense notée !")
                 st.rerun()
         st.table(pd.read_sql_query("SELECT date, motif, montant FROM depenses ORDER BY id DESC", conn))
+
 # --- SECTION : TABLEAU DE BORD (PATRON SEULEMENT) ---
 elif menu == "📊 Tableau de Bord":
     st.header("📊 Performance & Statistiques")
