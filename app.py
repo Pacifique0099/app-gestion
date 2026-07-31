@@ -137,8 +137,14 @@ if not st.session_state.auth:
             c = conn.cursor()
             
             # On cherche l'utilisateur
-            c.execute("SELECT role FROM utilisateurs WHERE identifiant=? AND mot_de_passe=?", (u, p))
-            res = c.fetchone()
+            # NOUVEAU CODE SUPABASE :
+response = supabase.table("utilisateurs") \
+    .select("role") \
+    .eq("u", u) \
+    .eq("p", p) \
+    .execute()
+
+user = response.data
             if res:
                 st.session_state.auth, st.session_state.role, st.session_state.user = True, res[0], u
                 # On enregistre la présence (comme suggéré avant)
