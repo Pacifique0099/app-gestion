@@ -5,6 +5,7 @@ import datetime
 # --- SYSTÈME DE LICENCE ---
 import hashlib
 from supabase import create_client
+from sqlalchemy import create_engine, text
 
 # Remplacez par vos vraies infos copiées à l'étape 2
 url = "https://cvouehtjccrwqwibbpty.supabase.co"
@@ -97,18 +98,60 @@ if date_exp_str:
         st.stop() # Arrête tout le logiciel
     elif jours_restants <= 5:
         st.sidebar.warning(f"⚠️ Expire dans {jours_restants} jours")
-# --- 1. INITIALISATION ---
-def init_db():
-    conn = sqlite3.connect('boutique.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS produits (id INTEGER PRIMARY KEY AUTOINCREMENT, nom TEXT, prix_achat REAL, prix_vente REAL, quantite INTEGER, seuil_alerte INTEGER DEFAULT 5)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS ventes (id INTEGER PRIMARY KEY AUTOINCREMENT, produit_id INTEGER, quantite_vendue INTEGER, prix_total REAL, type_paiement TEXT, nom_client TEXT, statut_dette TEXT DEFAULT 'Payé', date TEXT DEFAULT CURRENT_TIMESTAMP)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS comptes_clients (id INTEGER PRIMARY KEY AUTOINCREMENT, nom_client TEXT UNIQUE, solde REAL DEFAULT 0)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS depenses (id INTEGER PRIMARY KEY AUTOINCREMENT, motif TEXT, montant REAL, date TEXT DEFAULT CURRENT_TIMESTAMP)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS utilisateurs (id INTEGER PRIMARY KEY AUTOINCREMENT, identifiant TEXT UNIQUE, mot_de_passe TEXT, role TEXT)''')
-    # Table pour l'historique des arrivages
-    c.execute('''CREATE TABLE IF NOT EXISTS arrivages (id INTEGER PRIMARY KEY AUTOINCREMENT, nom TEXT, quantite REAL, date TEXT DEFAULT CURRENT_TIMESTAMP)''')
-    
+
+# --- 1. INITIALISATION SUPABASE ---
+db_url = st.secrets["postgres"]["url"]
+engine = create_engine(db_url)
+
+with engine.begin() as conn:
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS produits (
+            id SERIAL PRIMARY KEY,
+            nom TEXT NOT NULL,
+            prix_achat NUMERIC DEFAULT 0,
+            prix_vente NUMERIC DEFAULT 0,
+            stock INT DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS ventes (
+            id SERIAL PRIMARY KEY,
+            date DATE DEFAULT CURRENT_DATE,
+            nom_client TEXT,
+            produit_id INT REFERENCES produits(id),
+            quantite_vendue INT,
+            prix_total NUMERIC,
+            reste_a_payer NUMERIC,
+            type_paiement TEXT,
+            statut_dette TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS comptes_clients (
+            id SERIAL PRIMARY KEY,
+            nom_client TEXT UNIQUE,
+            solde NUMERIC DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS depenses (
+            id SERIAL PRIMARY KEY,
+            date DATE DEFAULT CURRENT_DATE,
+            motif TEXT,
+            montant NUMERIC
+        );
+
+        CREATE TABLE IF NOT EXISTS utilisateurs (
+            id SERIAL PRIMARY KEY,
+            identifiant TEXT UNIQUE,
+            mot_de_passe TEXT,
+            role TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS arrivages (
+            id SERIAL PRIMARY KEY,
+            date DATE DEFAULT CURRENT_DATE,
+            nom TEXT,
+            quantite NUMERIC
+        );
+    """))
     # Table pour suivre les connexions
     c.execute('''CREATE TABLE IF NOT EXISTS presence (id INTEGER PRIMARY KEY AUTOINCREMENT, utilisateur TEXT, date_connexion TEXT)''')
     
