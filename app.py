@@ -131,30 +131,27 @@ if not st.session_state.auth:
     st.title("🔑 Connexion")
     
     with st.form("login"):
-        u = st.text_input("Identifiant").lower()
-        p = st.text_input("Mot de passe", type="password")
+    u = st.text_input("Identifiant").lower()
+    p = st.text_input("Mot de passe", type="password")
+    if st.form_submit_button("Se connecter"):
+        # Recherche de l'utilisateur dans Supabase
+        response = supabase.table("utilisateurs").select("role").eq("identifiant", u).eq("mot_de_passe", p).execute()
         
-        if st.form_submit_button("Se connecter"):
-            # Recherche de l'utilisateur dans Supabase
-            response = supabase.table("utilisateurs").select("role").eq("identifiant", u).eq("mot_de_passe", p).execute()
+        if response.data:
+            role = response.data[0]['role']
+            st.session_state.auth, st.session_state.role, st.session_state.user = True, role, u
             
-            if response.data:
-                role = response.data[0]['role']
-                st.session_state.auth = True
-                st.session_state.role = role
-                st.session_state.user = u
+            # Enregistrement de la présence dans Supabase
+            try:
+                supabase.table("presence").insert({"utilisateur": u}).execute()
+            except Exception:
+                pass
                 
-                # Enregistrement de la présence dans Supabase
-                try:
-                    supabase.table("presence").insert({"utilisateur": u}).execute()
-                except Exception:
-                    pass
-                    
-                st.rerun()
-            else:
-                st.error("Identifiants incorrects")
-                
-    st.stop()
+            st.rerun()
+        else:
+            st.error("Identifiants incorrects")
+            
+st.stop()
 
 # --- SIDEBAR & MENU ---
 st.sidebar.title(f"👤 {st.session_state.user}")
