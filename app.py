@@ -5,7 +5,6 @@ import datetime
 # --- SYSTÈME DE LICENCE ---
 import hashlib
 from supabase import create_client
-from sqlalchemy import create_engine, text
 from supabase import create_client, Client
 
 # Remplacez par vos vraies infos copiées à l'étape 2
