@@ -124,6 +124,9 @@ if not licence_info or licence_info[0] != "Active":
     st.stop()
     
 # --- 2. CONNEXION ---
+if "auth" not in st.session_state:
+    st.session_state.auth, st.session_state.role, st.session_state.user = False, None, None
+
 if not st.session_state.auth:
     st.title("🔑 Connexion")
     
