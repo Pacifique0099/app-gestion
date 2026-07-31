@@ -105,16 +105,6 @@ supabase_url = st.secrets["supabase"]["url"]
 supabase_key = st.secrets["supabase"]["key"]
 supabase: Client = create_client(supabase_url, supabase_key)
 
-    # Table pour suivre les connexions
-    c.execute('''CREATE TABLE IF NOT EXISTS presence (id INTEGER PRIMARY KEY AUTOINCREMENT, utilisateur TEXT, date_connexion TEXT)''')
-    
-    c.execute("SELECT COUNT(*) FROM utilisateurs")
-    if c.fetchone()[0] == 0:
-        c.execute("INSERT INTO utilisateurs (identifiant, mot_de_passe, role) VALUES (?,?,?)", ('admin', 'admin', 'Patron'))
-    conn.commit()
-    conn.close()
-
-init_db()
 
 # Vérification de la licence avant tout
 if not licence_info or licence_info[0] != "Active":
