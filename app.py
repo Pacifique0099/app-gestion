@@ -131,8 +131,8 @@ if not st.session_state.auth:
     st.title("🔑 Connexion")
     
     with st.form("login"):
-    u = st.text_input("Identifiant").lower()
-    p = st.text_input("Mot de passe", type="password")
+    u = st.text_input("u").lower()
+    p = st.text_input("p", type="password")
     if st.form_submit_button("Se connecter"):
         # Recherche de l'utilisateur dans Supabase
         response = supabase.table("utilisateurs").select("role").eq("identifiant", u).eq("mot_de_passe", p).execute()
