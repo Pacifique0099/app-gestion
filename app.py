@@ -126,41 +126,35 @@ if not licence_info or licence_info[0] != "Active":
 if "auth" not in st.session_state:
     st.session_state.auth, st.session_state.role, st.session_state.user = False, None, None
 
-# --- 2. CONNEXION (Modifié) ---
+# --- 2. CONNEXION ---
 if not st.session_state.auth:
-    st.title("🔐 Bienvenue")
-         with st.form("login"):
+    st.title("🔑 Connexion")
+    
+    with st.form("login"):
         u = st.text_input("Identifiant").lower()
         p = st.text_input("Mot de passe", type="password")
-        if st.form_submit_button("Se connecter"):
-        # Recherche de l'utilisateur dans Supabase
-        response = supabase.table("utilisateurs").select("role").eq("identifiant", u).eq("mot_de_passe", p).execute()
         
-        if response.data:
-            role = response.data[0]['role']
-            st.session_state.auth, st.session_state.role, st.session_state.user = True, role, u
+        if st.form_submit_button("Se connecter"):
+            # Recherche de l'utilisateur dans Supabase
+            response = supabase.table("utilisateurs").select("role").eq("identifiant", u).eq("mot_de_passe", p).execute()
             
-            # Enregistrement de la présence dans Supabase
-            try:
-                supabase.table("presence").insert({"utilisateur": u}).execute()
-            except Exception:
-                pass
+            if response.data:
+                role = response.data[0]['role']
+                st.session_state.auth = True
+                st.session_state.role = role
+                st.session_state.user = u
                 
-            st.rerun()
-        else:
-            st.error("Identifiants incorrects")
-            
-            st.stop()
-                # On enregistre la présence (comme suggéré avant)
-                c.execute("INSERT INTO presence (utilisateur, date_connexion) VALUES (?, CURRENT_TIMESTAMP)", (u,))
-                conn.commit()
+                # Enregistrement de la présence dans Supabase
+                try:
+                    supabase.table("presence").insert({"utilisateur": u}).execute()
+                except Exception:
+                    pass
+                    
                 st.rerun()
-            else: 
+            else:
                 st.error("Identifiants incorrects")
-            conn.close()
+                
     st.stop()
-
-conn = sqlite3.connect('boutique.db')
 
 # --- SIDEBAR & MENU ---
 st.sidebar.title(f"👤 {st.session_state.user}")
