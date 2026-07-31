@@ -129,11 +129,11 @@ if "auth" not in st.session_state:
 # --- 2. CONNEXION (Modifié) ---
 if not st.session_state.auth:
     st.title("🔐 Bienvenue")
-    with st.form("login"):
-        u = st.text_input("Identifiant").lower() # Ajout de .lower() ici
-        p = st.text_input("Mot de passe", type="password")
-        if st.form_submit_button("Se connecter"):
-            # Recherche de l'utilisateur dans Supabase
+   with st.form("login"):
+    u = st.text_input("Identifiant").lower()
+    p = st.text_input("Mot de passe", type="password")
+    if st.form_submit_button("Se connecter"):
+        # Recherche de l'utilisateur dans Supabase
         response = supabase.table("utilisateurs").select("role").eq("identifiant", u).eq("mot_de_passe", p).execute()
         
         if response.data:
@@ -144,11 +144,13 @@ if not st.session_state.auth:
             try:
                 supabase.table("presence").insert({"utilisateur": u}).execute()
             except Exception:
-                pass  # Ignore si la table presence n'existe pas encore
+                pass
                 
             st.rerun()
         else:
             st.error("Identifiants incorrects")
+            
+st.stop()
                 # On enregistre la présence (comme suggéré avant)
                 c.execute("INSERT INTO presence (utilisateur, date_connexion) VALUES (?, CURRENT_TIMESTAMP)", (u,))
                 conn.commit()
