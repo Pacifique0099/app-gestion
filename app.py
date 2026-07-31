@@ -133,20 +133,22 @@ if not st.session_state.auth:
         u = st.text_input("Identifiant").lower() # Ajout de .lower() ici
         p = st.text_input("Mot de passe", type="password")
         if st.form_submit_button("Se connecter"):
-            conn = sqlite3.connect('boutique.db')
-            c = conn.cursor()
+            # Recherche de l'utilisateur dans Supabase
+        response = supabase.table("utilisateurs").select("role").eq("identifiant", u).eq("mot_de_passe", p).execute()
+        
+        if response.data:
+            role = response.data[0]['role']
+            st.session_state.auth, st.session_state.role, st.session_state.user = True, role, u
             
-            # On cherche l'utilisateur
-            # NOUVEAU CODE SUPABASE :
-response = supabase.table("utilisateurs") \
-    .select("role") \
-    .eq("u", u) \
-    .eq("p", p) \
-    .execute()
-
-user = response.data
-            if res:
-                st.session_state.auth, st.session_state.role, st.session_state.user = True, res[0], u
+            # Enregistrement de la présence dans Supabase
+            try:
+                supabase.table("presence").insert({"utilisateur": u}).execute()
+            except Exception:
+                pass  # Ignore si la table presence n'existe pas encore
+                
+            st.rerun()
+        else:
+            st.error("Identifiants incorrects")
                 # On enregistre la présence (comme suggéré avant)
                 c.execute("INSERT INTO presence (utilisateur, date_connexion) VALUES (?, CURRENT_TIMESTAMP)", (u,))
                 conn.commit()
