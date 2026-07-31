@@ -6,6 +6,7 @@ import datetime
 import hashlib
 from supabase import create_client
 from sqlalchemy import create_engine, text
+from supabase import create_client, Client
 
 # Remplacez par vos vraies infos copiées à l'étape 2
 url = "https://cvouehtjccrwqwibbpty.supabase.co"
@@ -100,58 +101,10 @@ if date_exp_str:
         st.sidebar.warning(f"⚠️ Expire dans {jours_restants} jours")
 
 # --- 1. INITIALISATION SUPABASE ---
-db_url = st.secrets["postgres"]["url"]
-engine = create_engine(db_url)
+supabase_url = st.secrets["supabase"]["url"]
+supabase_key = st.secrets["supabase"]["key"]
+supabase: Client = create_client(supabase_url, supabase_key)
 
-with engine.begin() as conn:
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS produits (
-            id SERIAL PRIMARY KEY,
-            nom TEXT NOT NULL,
-            prix_achat NUMERIC DEFAULT 0,
-            prix_vente NUMERIC DEFAULT 0,
-            stock INT DEFAULT 0
-        );
-
-        CREATE TABLE IF NOT EXISTS ventes (
-            id SERIAL PRIMARY KEY,
-            date DATE DEFAULT CURRENT_DATE,
-            nom_client TEXT,
-            produit_id INT REFERENCES produits(id),
-            quantite_vendue INT,
-            prix_total NUMERIC,
-            reste_a_payer NUMERIC,
-            type_paiement TEXT,
-            statut_dette TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS comptes_clients (
-            id SERIAL PRIMARY KEY,
-            nom_client TEXT UNIQUE,
-            solde NUMERIC DEFAULT 0
-        );
-
-        CREATE TABLE IF NOT EXISTS depenses (
-            id SERIAL PRIMARY KEY,
-            date DATE DEFAULT CURRENT_DATE,
-            motif TEXT,
-            montant NUMERIC
-        );
-
-        CREATE TABLE IF NOT EXISTS utilisateurs (
-            id SERIAL PRIMARY KEY,
-            identifiant TEXT UNIQUE,
-            mot_de_passe TEXT,
-            role TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS arrivages (
-            id SERIAL PRIMARY KEY,
-            date DATE DEFAULT CURRENT_DATE,
-            nom TEXT,
-            quantite NUMERIC
-        );
-    """))
     # Table pour suivre les connexions
     c.execute('''CREATE TABLE IF NOT EXISTS presence (id INTEGER PRIMARY KEY AUTOINCREMENT, utilisateur TEXT, date_connexion TEXT)''')
     
